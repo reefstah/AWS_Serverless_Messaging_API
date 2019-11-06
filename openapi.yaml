@@ -1,0 +1,224 @@
+openapi: 3.0.1
+info:
+  title: Messaging API
+  description: This is a sample messaging API
+  contact:
+    email: messaging_API@ralph.tech
+  license:
+    name: MIT
+    url: 'https://choosealicense.com/licenses/mit/'
+  version: 1.0.0
+servers:
+  - url: 'http://messaging-api.ralph.tech'
+tags:
+  - name: SMS
+    description: 'https://en.wikipedia.org/wiki/SMS'
+  - name: MAIL
+    description: 'https://en.wikipedia.org/wiki/Email'
+paths:
+  '/recipants/{recipantID}/messages':
+    get:
+      tags:
+        - MAIL
+        - SMS
+      summary: Lists all send messages to a recipant
+      parameters:
+        - name: recipantID
+          in: path
+          description: ID of the recipant to retrieve messages for
+          required: true
+          schema:
+            type: string
+        - name: cursor
+          in: query
+          description: Cursor value of the page you wish to retrieve
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaginatedResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      security:
+        - messaging_auth:
+            - 'read:mail'
+            - 'read:sms'
+  '/recipants/{recipantID}/messages/sms':
+    post:
+      tags:
+        - SMS
+      summary: Send a new SMS message
+      parameters:
+        - name: recipantID
+          in: path
+          description: ID of the recipant to send a message to
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: The message that needs to be send
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SmsMessage'
+        required: true
+      responses:
+        '501':
+          description: Not Implemented
+      security:
+        - messaging_auth:
+            - 'write:sms'
+            - 'read:sms'
+  '/recipants/{recipantID}/messages/mail':
+    post:
+      tags:
+        - MAIL
+      summary: Send a new mail message
+      parameters:
+        - name: recipantID
+          in: path
+          description: ID of the recipant to send a message to
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: The message that needs to be send
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MailMessage'
+        required: true
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MailMessage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      security:
+        - messaging_auth:
+            - 'write:mail'
+            - 'read:mail'
+components:
+  schemas:
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+        message:
+          type: string
+          description: content of the messages send by mail or SMS
+        type:
+          type: string
+          enum: [SMS, MAIL]
+    SmsMessage:
+      type: object
+      properties:
+        message:
+          type: string
+          description: >
+            Each SMS message can contain up to 140 bytes, and the character limit depends on the encoding scheme. For example, an SMS message can contain:
+            
+            - 160 GSM characters
+            
+            - 140 ASCII characters
+            
+            - 70 UCS-2 characters
+        messageEncoding:
+          type: string
+          enum: [GSM, ASCII, UCS-2]
+        phoneNumber:
+          type: string
+          description: >
+            When you send an SMS message, specify the phone number using the E.164 format. E.164 is a standard for the phone number structure used for international telecommunication. Phone numbers that follow this format can have a maximum of 15 digits, and they are prefixed with the plus character (+) and the country code.
+          example: >
+             For example, a U.S. phone number in E.164 format would appear as +1XXX5550100.
+          maxLength: 19
+          format: E.164
+    MailMessage:
+      type: object
+      properties:
+        to:
+          description: the email address to receive your message
+          type: string
+          format: email
+        subject:
+          type: string
+          maxLength: 1000
+        body:
+          description: plain text message body to send
+          type: string
+          maxLength: 9000
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+    PaginatedResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+        cursors:
+          $ref: '#/components/schemas/Cursors'
+    Cursors:
+      type: object
+      properties:
+        self:
+          description: Pagination link pointing to the current page.
+          type: string
+          format: uri
+        first:
+          description: Pagination link pointing to the first page.
+          type: string
+          format: uri
+        prev:
+          description: Pagination link pointing to the previous page.
+          type: string
+          format: uri
+        next:
+          description: Pagination link pointing to the next page.
+          type: string
+          format: uri
+    
+  securitySchemes:
+    messaging_auth:
+      type: oauth2
+      flows:
+        implicit:
+          authorizationUrl: 'https://localhost:8080'
+          scopes:
+            'write:mail': sending mail messages to recpipients
+            'write:sms': sending sms messages to recpipients
+            'read:mail': read sent mail messages to recipients
+            'read:sms': read sent SMS messages to recipients
+    api_key:
+      type: apiKey
+      name: api_key
+      in: header
+  responses:
+    BadRequest:
+      description: the request doesn't match the requirements
+      content:
+        application/json:
+          schema: 
+            $ref: '#/components/schemas/Error'
+          examples:
+            MissingParameters:
+              value:
+                message: "Missing required request parameters: [h1]"
+            InvalidBody:
+              value:
+                message: "Invalid request body"
